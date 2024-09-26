@@ -15,7 +15,7 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
-const collection = db.collection('products'); // Collection products trong Firestore
+const collection = db.collection('Tree Shop'); // Collection products trong Firestore
 
 // CRUD APIs
 
