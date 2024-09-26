@@ -9,9 +9,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^4.21.0",
+    "firebase": "^10.13.2",
+    "firebase-admin": "^12.5.0",
     "mongoose": "^8.6.3",
-    "nodejs-mongodb-example": "file:"
+    "nodejs-mongodb-example": "file:",
+    "react-scripts": "^5.0.1"
   },
   "description": ""
 }
