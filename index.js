@@ -1,77 +1,82 @@
 const express = require('express');
-const mongoose = require('mongoose');
-const Item = require('./models/Item');
+const admin = require('firebase-admin');
+require('dotenv').config(); // Nạp biến môi trường từ file .env
 
 const app = express();
-const port = 9000;
+app.use(express.json()); // Để đọc dữ liệu JSON từ request body
 
-mongoose.connect('mongodb://localhost:27017/ecommerce_db')
-        .then( ()=>{
-             console.log('Connected to MongoDB...');
-         })
-        .catch(err => {
-             console.error('Error connecting to MongoDB...', err);
-        });
-//Parse JSON -> Dùng Middleware
-app.use(express.json());            
-
-
-//1. API liệt kê tất cả các items
-app.get('/items', async(req, res)=>{
-    try {
-        const items = await Item.find();
-        res.json(items);
-    } catch (error) {
-        res.status(500).json({message: error.message});
-    }
+//Khởi tạo mội trường SDK của Firebase
+admin.initializeApp({
+  credential: admin.credential.cert({
+    private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Xử lý ký tự xuống dòng
+    client_email: process.env.FIREBASE_CLIENT_EMAIL,
+    project_id: process.env.FIREBASE_PROJECT_ID,
+  }),
 });
 
-//2. Lấy chi tiết item theo ID:Get
-app.get('/items/:id',async(req, res) => {
-    try {
-        const items = await Item.findById(req.params.id);
-        if(!items) return res.status(404).json({message: 'Item not found'});
-        res.json(items);
-    } catch (error) {
-        res.status(500).json({message: error.message});
-    }
+const db = admin.firestore();
+const collection = db.collection('products'); // Collection products trong Firestore
+
+// CRUD APIs
+
+// 1. Create a new product: POST
+app.post('/products', async (req, res) => {
+  try {
+    const product = req.body;
+    const docRef = await collection.add(product);
+    res.status(201).send({ id: docRef.id, message: 'Product created successfully' });
+  } catch (error) {
+    res.status(500).send('Error creating product: ' + error.message);
+  }
 });
 
-//3. API Lấy ra cập nhập theo ID:PUT 
-app.put('/items/:id' ,async(req, res) =>{
-    try {
-        const item = await Item.findByIdAndUpdate(req.params.id, req.body, {new: true});
-        if(!item) return res.status(404).json({message: 'Item not found'});
-        res.json(item);
-    } catch (error) {
-        res.status(500).json({message: error.message});
-    }
+// 2. Read all products : GET
+app.get('/products', async (req, res) => {
+  try {
+    const snapshot = await collection.get();
+    const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.status(200).json(products);
+  } catch (error) {
+    res.status(500).send('Error fetching products: ' + error.message);
+  }
 });
 
-//4. API Thêm item mới ID:POST
-app.post('/items' ,async(req, res)=>{
-    try {
-        const item = new Item(req.body);
-        await item.save();
-        res.status(201).json(item);
-    } catch (error) {
-        res.status(400).json({message: error.message});
+// 3. Read a product by ID : GET/id
+app.get('/products/:id', async (req, res) => {
+  try {
+    const doc = await collection.doc(req.params.id).get();
+    if (!doc.exists) {
+      return res.status(404).send('Product not found');
     }
-
+    res.status(200).json({ id: doc.id, ...doc.data() });
+  } catch (error) {
+    res.status(500).send('Error fetching product: ' + error.message);
+  }
 });
 
-//5. API xóa Item theo ID delete
-app.delete('/items/:id' ,async(req, rea)=>{
-    try {
-        const item = await Item.findByIdAndDelete(req.params.id);
-        if(!item) return res.status(404).json({message: 'Item not found'});
-        res.json(item);
-    } catch (error) {
-        res.status(500).json({message: error.message});
-    }
+// 4. Update a product by ID: PUT/id
+app.put('/products/:id', async (req, res) => {
+  try {
+    const updatedProduct = req.body;
+    await collection.doc(req.params.id).update(updatedProduct);
+    res.status(200).send('Product updated successfully');
+  } catch (error) {
+    res.status(500).send('Error updating product: ' + error.message);
+  }
 });
 
-//Cấu hình server
-app.listen(port,() => {
-    console.log(`Server is running on http://localhost:27017 ${port}`);
+// 5. Delete a product by ID: DELETE/id
+app.delete('/products/:id', async (req, res) => {
+  try {
+    await collection.doc(req.params.id).delete();
+    res.status(200).send('Product deleted successfully');
+  } catch (error) {
+    res.status(500).send('Error deleting product: ' + error.message);
+  }
+});
+
+// Chạy server với port online hoặc 3000 local
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
